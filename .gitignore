@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# WhatsApp/browser session data (contains live login cookies)
+session/
+.playwright-whatsapp-session/
+
+# router config backup (contains plaintext credentials)
+backup-secret.rsc
+*.rsc
+
+# customer data (PII: nama, no HP, tagihan)
+data/
+new kristek.xlsx
+
+# contract/legal document
+FINAL PKS - 01PKSTSK-RSPIII2026.docx
+
+# logs
+logs/
+
+# macOS
+.DS_Store
+
+# selenium test build artifacts
+selenium-whatsapp-test/target/

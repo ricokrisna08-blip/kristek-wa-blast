@@ -1,0 +1,22 @@
+{
+  "name": "kristek-wa-blast",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsx index.ts",
+    "playwright:install": "playwright install chromium"
+  },
+  "keywords": [],
+  "dependencies": {
+    "playwright": "^1.44.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.9.1",
+    "@types/node": "^20.14.4"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC"
+}
