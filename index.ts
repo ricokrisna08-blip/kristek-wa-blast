@@ -4,6 +4,15 @@ import { basename, extname, resolve } from "path";
 import { chromium } from "playwright";
 import type { Page } from "playwright";
 import * as XLSX from "xlsx";
+import {
+  type CustomerRow,
+  prepareCustomers,
+  delay,
+  randomDelay,
+  buildMessage,
+  waitForWhatsappReady,
+  openAndSend,
+} from "./lib/whatsapp.js";
 
 // 🔥 MODE
 const args = process.argv.slice(2);
@@ -14,16 +23,6 @@ const MODE = positional[0] || "billing";
 const DATA_FILE = positional[1];
 
 const LOG_DIR = resolve(process.cwd(), "logs");
-
-// ================= TYPES =================
-type CustomerRow = {
-  no_hp: string;
-  nama?: string;
-  nama_catering?: string;
-  tagihan?: string;
-  periode?: string;
-  jatuh_tempo?: string;
-};
 
 // ================= DATA =================
 const DATA_FILES = {
@@ -168,61 +167,6 @@ async function readCustomers(filePath: string): Promise<CustomerRow[]> {
   throw new Error(`Unsupported data file type: ${ext}`);
 }
 
-// ================= UTILS =================
-function normalizePhone(raw: string): string {
-  let p = (raw || "").replace(/\D/g, "");
-
-  if (!p) return "";
-  if (p.startsWith("0")) p = "62" + p.slice(1);
-  else if (p.startsWith("8")) p = "62" + p;
-
-  return p;
-}
-
-function formatRupiah(val?: string): string {
-  const num = Number(val || 0);
-  return new Intl.NumberFormat("id-ID").format(num);
-}
-
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function randomDelay() {
-  return MODE === "marketing"
-    ? Math.random() * 7000 + 8000 // lebih aman
-    : Math.random() * 3000 + 3000;
-}
-
-function prepareCustomers(rows: CustomerRow[]): CustomerRow[] {
-  const seen = new Set<string>();
-  const valid: CustomerRow[] = [];
-  let skippedInvalid = 0;
-  let skippedDupe = 0;
-
-  for (const row of rows) {
-    const phone = normalizePhone(row.no_hp);
-
-    if (!phone || phone.length < 10) {
-      skippedInvalid++;
-      continue;
-    }
-
-    if (seen.has(phone)) {
-      skippedDupe++;
-      continue;
-    }
-
-    seen.add(phone);
-    valid.push({ ...row, no_hp: phone });
-  }
-
-  if (skippedInvalid > 0) console.log(`⚠️  Skip ${skippedInvalid} baris: nomor HP kosong/invalid`);
-  if (skippedDupe > 0) console.log(`⚠️  Skip ${skippedDupe} baris: nomor HP duplikat`);
-
-  return valid;
-}
-
 // ================= PROGRESS (resume support) =================
 type Progress = { sent: string[] };
 
@@ -245,91 +189,6 @@ function loadProgress(path: string): Set<string> {
 function saveProgress(path: string, sent: Set<string>) {
   if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
   writeFileSync(path, JSON.stringify({ sent: [...sent] }, null, 2));
-}
-
-// ================= MESSAGE =================
-function buildBillingMessage(c: CustomerRow): string {
-  return `👋 Halo Ibu/Bpk ${c.nama}, Berikut rincian tagihan internet Anda untuk periode *${c.periode}*:
-
-Pelanggan          : ${c.nama}
-Tagihan              : Rp ${formatRupiah(c.tagihan)}
-Periode               : ${c.periode}
-Jatuh Tempo     : ${c.jatuh_tempo}
-
-Pembayaran via:
-- BCA                    : 5465080521 a/n Rico Trie Krisna
-- DANA / GoPay   : 089699680859
-- Cash            : Hubungi admin
-
-Konfirmasi bukti transfer via WA: 08979749139
-
-*Pesan ini dikirim otomatis oleh sistem KRISTEK.*
-
-_*Notes_:
-*Pemakaian akan diisolir sementara oleh provider jika belum ada pembayaran lebih dari tanggal 06 setiap bulannya.*
-
-Powered by KRISTEK Wifi
-#KoneksiCepat&Terpercaya`;
-}
-
-function buildMarketingMessage(c: CustomerRow): string {
-  return `Halo Bapak/Ibu ${c.nama_catering} 🙏
-
-Perkenalkan, saya Sugiono, pemilik usaha supply sate yang berlokasi di :
-Jl. Fatimah Bawah RT 04/RW 14, Kel. Kemiri Muka, Kec. Beji, Depok.
-
-Kami menyediakan sate ayam dan kambing untuk kebutuhan catering dalam jumlah besar, dengan kualitas terjaga, rasa konsisten, dan harga yang kompetitif.
-
-Kami siap menjadi partner supplier yang dapat diandalkan untuk mendukung kebutuhan produksi catering Bapak/Ibu.
-
-Apabila berkenan, saya dapat mengirimkan informasi detail harga serta contoh produk.
-
-Terima kasih atas perhatian Bapak/Ibu 🙏`;
-}
-
-function buildApologyMessage(c: CustomerRow): string {
-  return `Halo Ibu/Bpk ${c.nama},
-
-Mohon maaf atas gangguan layanan masal yang terjadi saat ini.
-Kami sedang berusaha keras agar layanan kembali normal. hal ini dikarenakan adanya gangguan pada jaringan provider yang kami gunakan.
-perpindahan jalur dari udara ke jalur darat untuk sementara waktu menyebabkan gangguan yang tidak terduga.
-kami berharap semoga besok sudah kembali lancar.
-
-Terima kasih atas pengertian dan kesabaran Bapak/Ibu.
-
-Salam,
-Tim KRISTEK Wifi`;
-}
-
-function buildMessage(c: CustomerRow): string {
-  if (MODE === "marketing") return buildMarketingMessage(c);
-  if (MODE === "apology") return buildApologyMessage(c);
-  return buildBillingMessage(c);
-}
-
-// ================= WA =================
-async function waitForWhatsappReady(page: Page) {
-  console.log("🔄 Tunggu WhatsApp login...");
-  await page.waitForSelector("#pane-side", { timeout: 120000 });
-  console.log("✅ WhatsApp siap!");
-}
-
-async function openAndSend(page: Page, c: CustomerRow) {
-  const message = buildMessage(c);
-  const url = `https://web.whatsapp.com/send?phone=${c.no_hp}`;
-
-  const compose = page.locator(
-    'div[contenteditable="true"][data-tab="10"]'
-  );
-
-  await page.goto(url, { waitUntil: "domcontentloaded" });
-  await compose.waitFor({ timeout: 30000 });
-  await delay(500);
-
-  await compose.click();
-  await page.keyboard.insertText(message);
-  await delay(800);
-  await page.keyboard.press("Enter");
 }
 
 // ================= MAIN =================
@@ -382,7 +241,7 @@ async function main() {
     const tag = `[${i + 1}/${pending.length}]`;
 
     if (DRY_RUN) {
-      console.log(`${tag} 👀 ke ${c.no_hp}:\n${buildMessage(c)}\n`);
+      console.log(`${tag} 👀 ke ${c.no_hp}:\n${buildMessage(MODE, c)}\n`);
       successCount++;
       continue;
     }
@@ -390,7 +249,7 @@ async function main() {
     console.log(`${tag} 📲 Kirim ke:`, c.no_hp);
 
     try {
-      await openAndSend(page!, c);
+      await openAndSend(page!, MODE, c);
       console.log(`${tag} ✅ terkirim`);
       successCount++;
       sentSet.add(c.no_hp);
@@ -400,7 +259,7 @@ async function main() {
       failed.push({ phone: c.no_hp, error: String(err) });
     }
 
-    await delay(randomDelay());
+    await delay(randomDelay(MODE));
   }
 
   console.log("\n🔥 DONE");

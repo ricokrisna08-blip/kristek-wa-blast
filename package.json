@@ -5,16 +5,22 @@
   "main": "index.js",
   "scripts": {
     "start": "tsx index.ts",
+    "daemon": "tsx daemon.ts",
     "playwright:install": "playwright install chromium"
   },
   "keywords": [],
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
     "playwright": "^1.44.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node": "^20.14.4",
+    "@types/node-cron": "^3.0.11",
     "tsx": "^4.9.1",
-    "@types/node": "^20.14.4"
+    "typescript": "^7.0.2"
   },
   "type": "module",
   "author": "",

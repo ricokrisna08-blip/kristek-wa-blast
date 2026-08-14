@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# kredensial daemon (Supabase URL/key, akun System WA Blast)
+.env
+
 # WhatsApp/browser session data (contains live login cookies)
 session/
 .playwright-whatsapp-session/
