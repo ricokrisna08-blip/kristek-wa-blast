@@ -9,6 +9,7 @@ export type CustomerRow = {
   is_kompensasi?: boolean;
   periode?: string;
   jatuh_tempo?: string;
+  invoice_no?: string;
 };
 
 export function normalizePhone(raw: string): string {
@@ -132,6 +133,22 @@ export function buildMessage(mode: string, c: CustomerRow): string {
   return buildBillingMessage(c);
 }
 
+// Caption pendek yang nemenin gambar flyer -- ini teks ASLI (bukan
+// bagian dari gambar), jadi pelanggan bisa tekan-lama lalu Copy nomor
+// rekening/e-wallet-nya langsung dari sini, sama kayak nge-copy pesan WA
+// biasa (gambar sendiri statis, nggak ada tombol yang bisa dipencet).
+export function buildBillingCaption(c: CustomerRow): string {
+  return `📋 Detail lengkap ada di gambar di atas.
+
+💳 Nomor Pembayaran (tap & tahan untuk copy):
+BCA: 5465080521 a/n Rico Trie Krisna
+DANA/GoPay: 089699680859
+
+Sudah transfer? Kirim bukti ke: 08979749139
+
+Powered by KRISTEK Wifi`;
+}
+
 export async function waitForWhatsappReady(page: Page) {
   console.log("🔄 Tunggu WhatsApp login...");
   await page.waitForSelector("#pane-side", { timeout: 120000 });
@@ -152,4 +169,45 @@ export async function openAndSend(page: Page, mode: string, c: CustomerRow) {
   await page.keyboard.insertText(message);
   await delay(800);
   await page.keyboard.press("Enter");
+}
+
+// Kirim gambar (flyer) + caption teks ke satu nomor. Selector-selector
+// di bawah ini ngikutin struktur WhatsApp Web per saat ditulis -- WA
+// sering ubah DOM-nya tanpa pemberitahuan, jadi kalau ini gagal di
+// kemudian hari, itu tanda pertama yang perlu dicek adalah selector
+// attach-menu/file-input/tombol-kirim-nya, BUKAN logic di sekitarnya.
+// WAJIB dites manual dulu ke satu nomor sebelum dipakai blast massal.
+export async function openAndSendImage(
+  page: Page,
+  phone: string,
+  imagePath: string,
+  caption: string
+) {
+  const url = `https://web.whatsapp.com/send?phone=${phone}`;
+  const compose = page.locator('div[contenteditable="true"][data-tab="10"]');
+
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await compose.waitFor({ timeout: 30000 });
+  await delay(500);
+
+  // Buka menu lampiran (ikon "+"/klip) supaya WhatsApp nyuntik <input
+  // type="file"> buat foto/video ke DOM.
+  await page.locator('[data-icon="plus-rounded"], button[title="Attach"], span[data-icon="clip"]').first().click();
+  await delay(300);
+
+  const fileInput = page.locator('input[accept*="image"]').first();
+  await fileInput.setInputFiles(imagePath);
+
+  // Modal preview gambar muncul, dengan kotak caption di bawahnya.
+  const captionBox = page.locator('div[contenteditable="true"][data-tab="10"], div[aria-label="Add a caption"]').first();
+  await captionBox.waitFor({ timeout: 30000 });
+  await delay(500);
+
+  await captionBox.click();
+  await page.keyboard.insertText(caption);
+  await delay(500);
+
+  const sendButton = page.locator('[data-icon="send"], [data-icon="wds-ic-send-filled"]').first();
+  await sendButton.click();
+  await delay(1000);
 }

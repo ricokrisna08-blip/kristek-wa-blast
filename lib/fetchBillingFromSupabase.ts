@@ -1,24 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CustomerRow } from "./whatsapp.js";
 
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
+// Nama bulan Indonesia -- pelanggan-nya orang Indonesia, jadi "Agustus"
+// bukan "August" (sama seperti semua format tanggal id-ID di kristek-app).
 function currentPeriodeLabel(): string {
   const now = new Date();
-  return `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  return now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
 
 // Jatuh tempo KRISTEK tanggal 3 tiap bulan (lihat mikrotik-daily-billing-cycle
@@ -26,7 +13,14 @@ function currentPeriodeLabel(): string {
 // isolir kalau belum bayar per tanggal 7").
 function jatuhTempoLabel(): string {
   const now = new Date();
-  return `03 ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+  const dueDate = new Date(now.getFullYear(), now.getMonth(), 3);
+  return `03 ${dueDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}`;
+}
+
+// #INV-{bulan}{tahun}, mis. Agustus 2026 -> "082026".
+function currentInvoiceNo(): string {
+  const now = new Date();
+  return `${String(now.getMonth() + 1).padStart(2, "0")}${now.getFullYear()}`;
 }
 
 // Sama seperti getLaporanKeuangan.ts di app: "belum bayar bulan ini" itu
@@ -63,6 +57,7 @@ export async function fetchBillingFromSupabase(client: SupabaseClient): Promise<
 
   const periode = currentPeriodeLabel();
   const jatuhTempo = jatuhTempoLabel();
+  const invoiceNo = currentInvoiceNo();
 
   return (data ?? [])
     .map((row) => {
@@ -78,6 +73,7 @@ export async function fetchBillingFromSupabase(client: SupabaseClient): Promise<
         is_kompensasi: row.kompensasi_nominal != null,
         periode,
         jatuh_tempo: jatuhTempo,
+        invoice_no: invoiceNo,
       };
     })
     .filter((row) => row.tagihanAngka > 0)

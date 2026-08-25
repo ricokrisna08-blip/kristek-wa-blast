@@ -22,6 +22,9 @@ FINAL PKS - 01PKSTSK-RSPIII2026.docx
 # logs
 logs/
 
+# flyer PNG sementara (di-render per-Pelanggan, dihapus lagi habis kirim)
+tmp/
+
 # macOS
 .DS_Store
 
