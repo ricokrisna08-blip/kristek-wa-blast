@@ -5,6 +5,8 @@ export type CustomerRow = {
   nama?: string;
   nama_catering?: string;
   tagihan?: string;
+  is_prorata?: boolean;
+  is_kompensasi?: boolean;
   periode?: string;
   jatuh_tempo?: string;
 };
@@ -64,10 +66,18 @@ export function prepareCustomers(rows: CustomerRow[]): CustomerRow[] {
 }
 
 export function buildBillingMessage(c: CustomerRow): string {
+  const tags = [
+    c.is_prorata ? "[Prorata]" : "",
+    c.is_kompensasi ? "[Kompensasi Gangguan]" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const tagihanLabel = `Rp ${formatRupiah(c.tagihan)}${tags ? ` ${tags}` : ""}`;
+
   return `👋 Halo Ibu/Bpk ${c.nama}, Berikut rincian tagihan internet Anda untuk periode *${c.periode}*:
 
 Pelanggan          : ${c.nama}
-Tagihan              : Rp ${formatRupiah(c.tagihan)}
+Tagihan              : ${tagihanLabel}
 Periode               : ${c.periode}
 Jatuh Tempo     : ${c.jatuh_tempo}
 
