@@ -197,14 +197,26 @@ export async function openAndSendImage(
   // accept="image/*,video/..."> ke DOM buat opsi "Foto & Video" --
   // TIDAK perlu klik teks menu-nya, langsung setInputFiles ke situ (ini
   // juga yang bikin nggak perlu berurusan sama file-picker native OS).
+  //
+  // PENTING: ada input file LAIN yang accept-nya juga "image/*" doang
+  // (punya "Stiker baru") -- kalau ketimpa itu, WhatsApp buka editor
+  // stiker, bukan kirim foto biasa, dan caption-nya jadi nyasar ke kotak
+  // chat utama di belakangnya (ini persis bug yang kejadian pas testing).
+  // Filter accept yang ada "video"-nya, cuma dipunya input Foto & Video.
   await page.locator('[data-icon="ic-attach-file"]').first().click();
   await delay(300);
 
-  const fileInput = page.locator('input[type="file"][accept*="image"]').first();
+  const fileInput = page.locator('input[type="file"][accept*="video"]').first();
   await fileInput.setInputFiles(imagePath);
 
-  // Modal preview gambar muncul, dengan kotak caption di bawahnya.
-  const captionBox = page.locator('div[contenteditable="true"][data-tab="10"], div[aria-label="Add a caption"]').first();
+  // Modal preview gambar muncul, dengan kotak caption di bawahnya. Kotak
+  // chat utama (juga contenteditable+data-tab="10") kemungkinan masih
+  // ada di DOM di belakang modal ini -- pakai :visible + .last() (modal
+  // biasanya di-append belakangan di DOM) supaya nggak ketimpa balik ke
+  // kotak chat utama seperti bug file-input di atas.
+  const captionBox = page
+    .locator('div[contenteditable="true"][data-tab="10"]:visible, div[aria-label="Add a caption"]:visible')
+    .last();
   await captionBox.waitFor({ timeout: 30000 });
   await delay(500);
 
