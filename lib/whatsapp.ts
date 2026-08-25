@@ -192,22 +192,28 @@ export async function openAndSendImage(
 
   // Buka menu lampiran -- ikon-nya "ic-attach-file" (dicek langsung di
   // WhatsApp Web, data-icon dipakai karena nggak bergantung bahasa UI,
-  // beda dari aria-label "Lampirkan"/"Attach" yang berubah-ubah). Begitu
-  // menu ini kebuka, WhatsApp langsung nyuntik <input type="file"
-  // accept="image/*,video/..."> ke DOM buat opsi "Foto & Video" --
-  // TIDAK perlu klik teks menu-nya, langsung setInputFiles ke situ (ini
-  // juga yang bikin nggak perlu berurusan sama file-picker native OS).
-  //
-  // PENTING: ada input file LAIN yang accept-nya juga "image/*" doang
-  // (punya "Stiker baru") -- kalau ketimpa itu, WhatsApp buka editor
-  // stiker, bukan kirim foto biasa, dan caption-nya jadi nyasar ke kotak
-  // chat utama di belakangnya (ini persis bug yang kejadian pas testing).
-  // Filter accept yang ada "video"-nya, cuma dipunya input Foto & Video.
+  // beda dari aria-label "Lampirkan"/"Attach" yang berubah-ubah).
   await page.locator('[data-icon="ic-attach-file"]').first().click();
   await delay(300);
 
-  const fileInput = page.locator('input[type="file"][accept*="video"]').first();
-  await fileInput.setInputFiles(imagePath);
+  // WhatsApp BARU bikin <input type="file"> begitu menu item "Foto &
+  // Video" itu sendiri diklik (dicek langsung: nggak ada input yang
+  // accept-nya include video sebelum item ini diklik) -- jadi HARUS
+  // diklik betulan, bukan langsung cari input yang udah ada. Klik
+  // biasa bakal munculin native OS file picker (yang nggak bisa
+  // diotomasi), makanya pakai Playwright filechooser interception:
+  // event ini nangkep dialog itu sebelum kebuka, kasih kita akses
+  // programatik ke situ lewat setFiles().
+  //
+  // "Foto & Video" ini nggak punya data-icon sendiri (dicek: aria-label
+  // + teksnya sama persis "Foto & Video", nggak ada ikon di dalam
+  // elemen button-nya) -- makanya harus dicocokkan lewat nama, dengan
+  // fallback bahasa Inggris kalau akun WhatsApp-nya diset non-Indonesia.
+  const [fileChooser] = await Promise.all([
+    page.waitForEvent("filechooser", { timeout: 10000 }),
+    page.getByRole("menuitem", { name: /Foto & Video|Photos & videos/i }).click(),
+  ]);
+  await fileChooser.setFiles(imagePath);
 
   // Modal preview gambar muncul, dengan kotak caption di bawahnya. Kotak
   // chat utama (juga contenteditable+data-tab="10") kemungkinan masih
