@@ -190,12 +190,17 @@ export async function openAndSendImage(
   await compose.waitFor({ timeout: 30000 });
   await delay(500);
 
-  // Buka menu lampiran (ikon "+"/klip) supaya WhatsApp nyuntik <input
-  // type="file"> buat foto/video ke DOM.
-  await page.locator('[data-icon="plus-rounded"], button[title="Attach"], span[data-icon="clip"]').first().click();
+  // Buka menu lampiran -- ikon-nya "ic-attach-file" (dicek langsung di
+  // WhatsApp Web, data-icon dipakai karena nggak bergantung bahasa UI,
+  // beda dari aria-label "Lampirkan"/"Attach" yang berubah-ubah). Begitu
+  // menu ini kebuka, WhatsApp langsung nyuntik <input type="file"
+  // accept="image/*,video/..."> ke DOM buat opsi "Foto & Video" --
+  // TIDAK perlu klik teks menu-nya, langsung setInputFiles ke situ (ini
+  // juga yang bikin nggak perlu berurusan sama file-picker native OS).
+  await page.locator('[data-icon="ic-attach-file"]').first().click();
   await delay(300);
 
-  const fileInput = page.locator('input[accept*="image"]').first();
+  const fileInput = page.locator('input[type="file"][accept*="image"]').first();
   await fileInput.setInputFiles(imagePath);
 
   // Modal preview gambar muncul, dengan kotak caption di bawahnya.
