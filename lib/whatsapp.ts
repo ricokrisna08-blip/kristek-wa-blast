@@ -171,12 +171,18 @@ export async function openAndSend(page: Page, mode: string, c: CustomerRow) {
   await page.keyboard.press("Enter");
 }
 
-// Kirim gambar (flyer) + caption teks ke satu nomor. Selector-selector
-// di bawah ini ngikutin struktur WhatsApp Web per saat ditulis -- WA
-// sering ubah DOM-nya tanpa pemberitahuan, jadi kalau ini gagal di
-// kemudian hari, itu tanda pertama yang perlu dicek adalah selector
-// attach-menu/file-input/tombol-kirim-nya, BUKAN logic di sekitarnya.
-// WAJIB dites manual dulu ke satu nomor sebelum dipakai blast massal.
+// Kirim gambar (flyer) + caption teks ke satu nomor, sebagai DOKUMEN
+// (bukan Foto & Video) -- WhatsApp cuma kompres ulang jadi JPEG kalau
+// dikirim lewat Foto & Video (kualitas turun, teks jadi buram); lewat
+// Dokumen filenya utuh apa adanya, walau konsekuensinya pelanggan harus
+// tap dulu buat buka (nggak langsung tampil kayak foto biasa di chat).
+//
+// Selector-selector di bawah ini ngikutin struktur WhatsApp Web per saat
+// ditulis -- WA sering ubah DOM-nya tanpa pemberitahuan, jadi kalau ini
+// gagal di kemudian hari, itu tanda pertama yang perlu dicek adalah
+// selector attach-menu/file-input/tombol-kirim-nya, BUKAN logic di
+// sekitarnya. WAJIB dites manual dulu ke satu nomor sebelum dipakai
+// blast massal.
 export async function openAndSendImage(
   page: Page,
   phone: string,
@@ -196,22 +202,22 @@ export async function openAndSendImage(
   await page.locator('[data-icon="ic-attach-file"]').first().click();
   await delay(300);
 
-  // WhatsApp BARU bikin <input type="file"> begitu menu item "Foto &
-  // Video" itu sendiri diklik (dicek langsung: nggak ada input yang
-  // accept-nya include video sebelum item ini diklik) -- jadi HARUS
-  // diklik betulan, bukan langsung cari input yang udah ada. Klik
-  // biasa bakal munculin native OS file picker (yang nggak bisa
-  // diotomasi), makanya pakai Playwright filechooser interception:
-  // event ini nangkep dialog itu sebelum kebuka, kasih kita akses
-  // programatik ke situ lewat setFiles().
+  // WhatsApp BARU bikin <input type="file"> begitu menu item "Dokumen"
+  // itu sendiri diklik (sama kayak "Foto & Video" -- dicek langsung,
+  // nggak ada input yang relevan sebelum item ini diklik) -- jadi HARUS
+  // diklik betulan, bukan langsung cari input yang udah ada. Klik biasa
+  // bakal munculin native OS file picker (yang nggak bisa diotomasi),
+  // makanya pakai Playwright filechooser interception: event ini
+  // nangkep dialog itu sebelum kebuka, kasih kita akses programatik ke
+  // situ lewat setFiles().
   //
-  // "Foto & Video" ini nggak punya data-icon sendiri (dicek: aria-label
-  // + teksnya sama persis "Foto & Video", nggak ada ikon di dalam
-  // elemen button-nya) -- makanya harus dicocokkan lewat nama, dengan
-  // fallback bahasa Inggris kalau akun WhatsApp-nya diset non-Indonesia.
+  // "Dokumen" ini nggak punya data-icon sendiri (dicek: aria-label +
+  // teksnya sama persis "Dokumen", nggak ada ikon di dalam elemen
+  // button-nya) -- makanya harus dicocokkan lewat nama, dengan fallback
+  // bahasa Inggris kalau akun WhatsApp-nya diset non-Indonesia.
   const [fileChooser] = await Promise.all([
     page.waitForEvent("filechooser", { timeout: 10000 }),
-    page.getByRole("menuitem", { name: /Foto & Video|Photos & videos/i }).click(),
+    page.getByRole("menuitem", { name: /Dokumen|Document/i }).click(),
   ]);
   await fileChooser.setFiles(imagePath);
 

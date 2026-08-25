@@ -65,6 +65,16 @@ export async function renderFlyerBuffer(
   }
 }
 
+// Nama file ini yang bakal muncul ke pelanggan (dikirim sebagai Dokumen,
+// bukan Foto & Video -- lihat openAndSendImage) -- jadi dibikin
+// presentable, bukan cuma "flyer-<no_hp>.png".
+function slugify(value: string): string {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 // WhatsApp Web butuh path file buat upload (bukan Buffer langsung) --
 // simpan sementara di ./tmp, satu file per nomor supaya panggilan
 // paralel (kalau ada) nggak tabrakan.
@@ -75,7 +85,10 @@ export async function renderFlyerToTempFile(
   if (!existsSync(TMP_DIR)) mkdirSync(TMP_DIR, { recursive: true });
 
   const buffer = await renderFlyerBuffer(context, c);
-  const filePath = resolve(TMP_DIR, `flyer-${c.no_hp || Date.now()}.png`);
+  const nama = slugify(c.nama || "Pelanggan");
+  const periode = slugify(c.periode || "");
+  const fileName = `Tagihan-KRISTEK-${nama}${periode ? `-${periode}` : ""}-${c.no_hp || Date.now()}.png`;
+  const filePath = resolve(TMP_DIR, fileName);
   await writeFile(filePath, buffer);
   return filePath;
 }
