@@ -22,21 +22,12 @@
 // -- lihat README.md).
 
 import { chromium } from "playwright";
-import type { BrowserContext, Page } from "playwright";
-import { rm } from "fs/promises";
+import type { Page } from "playwright";
 import cron from "node-cron";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { connectSupabase } from "./lib/supabaseClient.js";
 import { fetchBillingFromSupabase } from "./lib/fetchBillingFromSupabase.js";
-import {
-  prepareCustomers,
-  delay,
-  randomDelay,
-  openAndSendImage,
-  buildBillingCaption,
-  waitForWhatsappReady,
-} from "./lib/whatsapp.js";
-import { renderFlyerToTempFile } from "./lib/renderFlyer.js";
+import { prepareCustomers, delay, randomDelay, openAndSend, waitForWhatsappReady } from "./lib/whatsapp.js";
 
 const POLL_INTERVAL_MS = 20_000;
 const CRON_SCHEDULE = "0 9 1 * *"; // menit jam tanggal bulan hari -- tanggal 1 jam 09:00
@@ -88,12 +79,7 @@ async function fetchNextPendingJob(client: SupabaseClient): Promise<WaBlastJobRo
   return data?.[0] ?? null;
 }
 
-async function processJob(
-  client: SupabaseClient,
-  context: BrowserContext,
-  page: Page,
-  job: WaBlastJobRow
-) {
+async function processJob(client: SupabaseClient, page: Page, job: WaBlastJobRow) {
   console.log(`\n🚀 Mulai job ${job.id} (mode: ${job.mode})`);
 
   if (job.mode !== "billing") {
@@ -150,17 +136,13 @@ async function processJob(
     const tag = `[${i + 1}/${customers.length}]`;
     console.log(`${tag} 📲 Kirim ke:`, c.no_hp);
 
-    let flyerPath: string | null = null;
     try {
-      flyerPath = await renderFlyerToTempFile(context, c);
-      await openAndSendImage(page, c.no_hp, flyerPath, buildBillingCaption(c));
+      await openAndSend(page, job.mode, c);
       sentCount++;
       console.log(`${tag} ✅ terkirim`);
     } catch (err) {
       failedCount++;
       console.log(`${tag} ❌ gagal kirim:`, err);
-    } finally {
-      if (flyerPath) await rm(flyerPath, { force: true });
     }
 
     await client
@@ -209,7 +191,7 @@ async function main() {
 
     isProcessing = true;
     try {
-      await processJob(client, context, page, job);
+      await processJob(client, page, job);
     } catch (err) {
       console.log(`❌ Error tak terduga waktu proses job ${job.id}:`, err);
     } finally {
