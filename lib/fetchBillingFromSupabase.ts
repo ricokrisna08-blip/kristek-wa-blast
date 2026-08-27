@@ -10,10 +10,19 @@ function currentPeriodeLabel(): string {
 
 // Jatuh tempo KRISTEK tanggal 3 tiap bulan (lihat mikrotik-daily-billing-cycle
 // di kristek-app: "jatuh tempo tanggal 3, masa tenggang sampai tanggal 6,
-// isolir kalau belum bayar per tanggal 7").
+// isolir kalau belum bayar per tanggal 7") -- tapi harus tanggal 3
+// TERDEKAT KE DEPAN, bukan selalu tanggal 3 bulan berjalan. Kalau blast
+// dikirim SETELAH tanggal 3 (mis. manual tanggal 27, atau masih ke-kirim
+// pas jendela isolir tanggal 7-14), tanggal 3 bulan ini udah lewat --
+// jatuh tempo yang relevan itu tanggal 3 bulan DEPAN. Pola cutoff-day
+// sama persis kayak computeProrata.ts/computeKompensasi.ts di kristek-app.
+const CUTOFF_DAY = 3;
 function jatuhTempoLabel(): string {
   const now = new Date();
-  const dueDate = new Date(now.getFullYear(), now.getMonth(), 3);
+  const dueDate =
+    now.getDate() >= CUTOFF_DAY
+      ? new Date(now.getFullYear(), now.getMonth() + 1, CUTOFF_DAY)
+      : new Date(now.getFullYear(), now.getMonth(), CUTOFF_DAY);
   return `03 ${dueDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" })}`;
 }
 
