@@ -1,6 +1,11 @@
 import type { Page } from "playwright";
 
 export type CustomerRow = {
+  // Cuma keisi buat baris yang datang dari fetchBillingFromSupabase.ts
+  // (billing mode) -- dipakai daemon buat nandain sudah_diblast_bulan_ini
+  // setelah kirim sukses. Baris CSV/XLSX manual (marketing/apology, lihat
+  // index.ts) nggak ada id Pelanggan sama sekali.
+  id?: string;
   no_hp: string;
   nama?: string;
   nama_catering?: string;

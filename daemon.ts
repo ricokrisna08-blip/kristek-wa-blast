@@ -36,6 +36,7 @@ type WaBlastJobRow = {
   id: string;
   mode: string;
   status: string;
+  pelanggan_ids: string[] | null;
 };
 
 async function insertScheduledJobIfNeeded(client: SupabaseClient, userId: string) {
@@ -66,7 +67,7 @@ async function insertScheduledJobIfNeeded(client: SupabaseClient, userId: string
 async function fetchNextPendingJob(client: SupabaseClient): Promise<WaBlastJobRow | null> {
   const { data, error } = await client
     .from("wa_blast_job")
-    .select("id, mode, status")
+    .select("id, mode, status, pelanggan_ids")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(1);
@@ -97,7 +98,7 @@ async function processJob(client: SupabaseClient, page: Page, job: WaBlastJobRow
 
   let customers;
   try {
-    const raw = await fetchBillingFromSupabase(client);
+    const raw = await fetchBillingFromSupabase(client, job.pelanggan_ids);
     customers = prepareCustomers(raw);
   } catch (err) {
     await client
@@ -140,6 +141,21 @@ async function processJob(client: SupabaseClient, page: Page, job: WaBlastJobRow
       await openAndSend(page, job.mode, c);
       sentCount++;
       console.log(`${tag} ✅ terkirim`);
+
+      // Nandain Pelanggan ini udah kekirim bulan ini -- dibaca
+      // fetchBillingFromSupabase.ts biar blast-penuh berikutnya (manual
+      // atau cron bulanan) skip dia, nggak kirim dobel. Error di sini
+      // dicatat log doang (bukan masuk failedCount) karena pesan WA-nya
+      // sendiri sudah beneran terkirim.
+      if (job.mode === "billing" && c.id) {
+        const { error: markError } = await client
+          .from("pelanggan")
+          .update({ sudah_diblast_bulan_ini: true, diblast_at: new Date().toISOString() })
+          .eq("id", c.id);
+        if (markError) {
+          console.log(`${tag} ⚠️  Gagal nandain sudah_diblast_bulan_ini:`, markError.message);
+        }
+      }
     } catch (err) {
       failedCount++;
       console.log(`${tag} ❌ gagal kirim:`, err);

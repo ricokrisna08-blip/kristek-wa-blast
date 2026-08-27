@@ -45,11 +45,31 @@ function currentInvoiceNo(): string {
 // computeKompensasi.ts di kristek-app) -- dikurangkan dari tagihan bulan
 // ini aja, ditandai "[Kompensasi Gangguan]" di pesan, lalu di-reset ke
 // null otomatis di siklus berikutnya sama seperti tagihan_prorata.
-export async function fetchBillingFromSupabase(client: SupabaseClient): Promise<CustomerRow[]> {
-  const { data, error } = await client
+//
+// pelangganIds: kalau diisi (dipilih manual lewat picker "Pilih
+// Pelanggan..." di WaBlastScreen), cuma ambil Pelanggan-Pelanggan itu --
+// TANPA filter sudah_diblast_bulan_ini, karena pemilihan manual selalu
+// dianggap resend eksplisit walau orangnya udah pernah dikirimin. Kalau
+// kosong/null (blast-penuh, termasuk job dari cron bulanan di
+// daemon.ts), tambah filter sudah_diblast_bulan_ini = false supaya
+// nggak kirim dobel ke orang yang udah kekirim duluan (baik lewat
+// manual maupun blast-penuh sebelumnya) di siklus yang sama.
+export async function fetchBillingFromSupabase(
+  client: SupabaseClient,
+  pelangganIds?: string[] | null
+): Promise<CustomerRow[]> {
+  let query = client
     .from("pelanggan")
-    .select("nama, no_hp, harga, tagihan_prorata, kompensasi_nominal")
+    .select("id, nama, no_hp, harga, tagihan_prorata, kompensasi_nominal")
     .eq("sudah_bayar_bulan_ini", false);
+
+  if (pelangganIds && pelangganIds.length > 0) {
+    query = query.in("id", pelangganIds);
+  } else {
+    query = query.eq("sudah_diblast_bulan_ini", false);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Gagal ambil data Pelanggan belum bayar dari Supabase: ${error.message}`);
@@ -65,6 +85,7 @@ export async function fetchBillingFromSupabase(client: SupabaseClient): Promise<
       const kompensasi = row.kompensasi_nominal ?? 0;
       const tagihanAngka = Math.max(dasar - kompensasi, 0);
       return {
+        id: row.id,
         no_hp: row.no_hp ?? "",
         nama: row.nama ?? "",
         tagihan: String(tagihanAngka),
