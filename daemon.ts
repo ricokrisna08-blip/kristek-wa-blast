@@ -22,7 +22,7 @@
 // -- lihat README.md).
 
 import { chromium } from "playwright";
-import type { Page } from "playwright";
+import type { BrowserContext, Page } from "playwright";
 import cron from "node-cron";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { connectSupabase } from "./lib/supabaseClient.js";
@@ -80,7 +80,7 @@ async function fetchNextPendingJob(client: SupabaseClient): Promise<WaBlastJobRo
   return data?.[0] ?? null;
 }
 
-async function processJob(client: SupabaseClient, page: Page, job: WaBlastJobRow) {
+async function processJob(client: SupabaseClient, getPage: () => Promise<Page>, job: WaBlastJobRow) {
   console.log(`\n🚀 Mulai job ${job.id} (mode: ${job.mode})`);
 
   if (job.mode !== "billing") {
@@ -138,7 +138,7 @@ async function processJob(client: SupabaseClient, page: Page, job: WaBlastJobRow
     console.log(`${tag} 📲 Kirim ke:`, c.no_hp);
 
     try {
-      await openAndSend(page, job.mode, c);
+      await openAndSend(await getPage(), job.mode, c);
       sentCount++;
       console.log(`${tag} ✅ terkirim`);
 
@@ -182,11 +182,28 @@ async function main() {
 
   const { client, userId } = await connectSupabase();
 
-  console.log("🔄 Buka browser WhatsApp Web...");
-  const context = await chromium.launchPersistentContext("./session", { headless: false });
-  const page = context.pages()[0] || (await context.newPage());
-  await page.goto("https://web.whatsapp.com");
-  await waitForWhatsappReady(page);
+  // Browser WhatsApp Web tetap dibuka sekali dan dipakai ulang, TAPI
+  // kalau jendelanya ketutup (nggak sengaja di-close, Cmd+Q, dsb.) dibuka
+  // ulang otomatis sebelum kirim berikutnya -- dulu daemon tetap jalan
+  // tanpa browser, jadi semua kiriman sisa job langsung gagal.
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
+
+  async function getPage(): Promise<Page> {
+    if (page && !page.isClosed()) return page;
+
+    if (page) console.log("⚠️  Browser WhatsApp ketutup, buka ulang...");
+    else console.log("🔄 Buka browser WhatsApp Web...");
+    await context?.close().catch(() => {});
+
+    context = await chromium.launchPersistentContext("./session", { headless: false });
+    page = context.pages()[0] || (await context.newPage());
+    await page.goto("https://web.whatsapp.com");
+    await waitForWhatsappReady(page);
+    return page;
+  }
+
+  await getPage();
 
   cron.schedule(CRON_SCHEDULE, () => {
     insertScheduledJobIfNeeded(client, userId).catch((err) =>
@@ -207,7 +224,7 @@ async function main() {
 
     isProcessing = true;
     try {
-      await processJob(client, page, job);
+      await processJob(client, getPage, job);
     } catch (err) {
       console.log(`❌ Error tak terduga waktu proses job ${job.id}:`, err);
     } finally {
@@ -217,7 +234,7 @@ async function main() {
 
   process.on("SIGINT", async () => {
     console.log("\n👋 Daemon dihentikan, tutup browser...");
-    await context.close();
+    await context?.close();
     process.exit(0);
   });
 }
