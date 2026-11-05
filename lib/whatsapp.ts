@@ -97,7 +97,7 @@ Konfirmasi bukti transfer via WA: 08979749139
 *Pesan ini dikirim otomatis oleh sistem KRISTEK.*
 
 _*Notes_:
-*Pemakaian akan diisolir sementara oleh provider jika belum ada pembayaran lebih dari tanggal 06 setiap bulannya.*
+*Pemakaian akan diisolir sementara oleh provider jika belum ada pembayaran sampai tanggal 06 jam 12:00 siang setiap bulannya.*
 
 Powered by KRISTEK Wifi
 #KoneksiCepat&Terpercaya`;
