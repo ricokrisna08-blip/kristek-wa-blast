@@ -10,7 +10,7 @@ function currentPeriodeLabel(): string {
 
 // Jatuh tempo KRISTEK tanggal 3 tiap bulan (lihat mikrotik-daily-billing-cycle
 // di kristek-app: "jatuh tempo tanggal 3, masa tenggang sampai tanggal 6,
-// isolir kalau belum bayar per tanggal 6 jam 12:00") -- tapi harus tanggal 3
+// isolir kalau belum bayar per tanggal 6 jam 18:00") -- tapi harus tanggal 3
 // TERDEKAT KE DEPAN, bukan selalu tanggal 3 bulan berjalan. Kalau blast
 // dikirim SETELAH tanggal 3 (mis. manual tanggal 27, atau masih ke-kirim
 // pas jendela isolir tanggal 6-14), tanggal 3 bulan ini udah lewat --
